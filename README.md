@@ -72,12 +72,16 @@ Optional setting:
 `branches`
 When present, this array limits which branches the packaging workflow is allowed to release from. Wildcards are supported, so values like `release/*` or `feature/*` are valid. If `branches` is omitted, the workflow defaults to `main` only.
 
+`i18n`
+Boolean toggle for localization-aware packaging validation. When `true`, packaging requires `manifest.json` to define `fallbackLanguage` and a non-empty `languages` array, requires `languages` to contain the configured `fallbackLanguage`, and requires `_locales` to be covered by `includes` and present in the package input.
+
 Operational notes:
 
 - `manifest.json` is always written into the archive by the packager and does not need to be listed in `includes`
 - `debug` packaging sets `devTools: true`
 - `release` packaging sets `devTools: false`
 - package output is written to `dist/`
+- when `i18n` is `true`, `_locales/**` should be included explicitly in `includes`
 
 ## Update config
 

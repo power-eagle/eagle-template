@@ -141,6 +141,47 @@ function resolveIncludedFiles(repoRoot, pkgRules) {
     .filter(filePath => shouldIncludeFile(filePath, includePatterns));
 }
 
+function validateI18nConfig(repoRoot, pkgRules, manifest, includedFiles) {
+  if (pkgRules.i18n !== true) {
+    return;
+  }
+
+  if (typeof manifest.fallbackLanguage !== 'string' || manifest.fallbackLanguage.trim() === '') {
+    throw new Error('i18n is enabled in pkg-rules.json, but manifest.json is missing fallbackLanguage');
+  }
+
+  if (!Array.isArray(manifest.languages) || manifest.languages.length === 0) {
+    throw new Error('i18n is enabled in pkg-rules.json, but manifest.json is missing a non-empty languages array');
+  }
+
+  if (!manifest.languages.includes(manifest.fallbackLanguage)) {
+    throw new Error('i18n is enabled in pkg-rules.json, but manifest.json languages must include fallbackLanguage');
+  }
+
+  const includePatterns = Array.isArray(pkgRules.includes) ? pkgRules.includes : [];
+  const hasLocalesInclude = includePatterns.some(pattern => {
+    if (pattern.includes('*')) {
+      return matchesGlob('_locales/en.json', pattern) || matchesGlob('_locales/example.json', pattern);
+    }
+
+    return isPathPrefix('_locales/en.json', pattern) || isPathPrefix('_locales/example.json', pattern);
+  });
+
+  if (!hasLocalesInclude) {
+    throw new Error('i18n is enabled in pkg-rules.json, but includes does not cover the _locales directory');
+  }
+
+  const localesDir = path.join(repoRoot, '_locales');
+  if (!fs.existsSync(localesDir) || !fs.statSync(localesDir).isDirectory()) {
+    throw new Error('i18n is enabled in pkg-rules.json, but the _locales directory is missing');
+  }
+
+  const hasLocaleFiles = includedFiles.some(filePath => filePath.startsWith('_locales/'));
+  if (!hasLocaleFiles) {
+    throw new Error('i18n is enabled in pkg-rules.json, but no _locales files are being packaged');
+  }
+}
+
 function buildArchiveEntries(repoRoot, filePaths, manifestContents) {
   const entries = filePaths.map(filePath => {
     const absolutePath = path.join(repoRoot, filePath);
@@ -169,6 +210,7 @@ function packagePlugin(type, options = {}) {
   const pkgRules = readJson(rulesPath);
   const processed = processManifest(type, repoRoot);
   const includedFiles = resolveIncludedFiles(repoRoot, pkgRules);
+  validateI18nConfig(repoRoot, pkgRules, processed.manifest, includedFiles);
 
   if (options.checkOnly) {
     return {
@@ -227,4 +269,5 @@ if (require.main === module) {
 module.exports = {
   packagePlugin,
   resolveIncludedFiles,
+  validateI18nConfig,
 };
